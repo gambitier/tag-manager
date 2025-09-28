@@ -1,5 +1,11 @@
 # Tag Manager
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/gambitier/tag-manager)](https://goreportcard.com/report/github.com/gambitier/tag-manager)
+[![Go Version](https://img.shields.io/badge/Go-1.21+-blue.svg)](https://golang.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Release](https://img.shields.io/github/v/release/gambitier/tag-manager)](https://github.com/gambitier/tag-manager/releases)
+[![pkg.go.dev](https://pkg.go.dev/badge/github.com/gambitier/tag-manager)](https://pkg.go.dev/github.com/gambitier/tag-manager)
+
 A generic CLI tool for managing version tags across multiple Go repositories.
 
 ## Features
