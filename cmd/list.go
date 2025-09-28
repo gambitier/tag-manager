@@ -2,11 +2,17 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/fatih/color"
 	"github.com/gambitier/tag-manager/pkg/discovery"
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+)
+
+var (
+	verbose bool
 )
 
 var listCmd = &cobra.Command{
@@ -14,6 +20,10 @@ var listCmd = &cobra.Command{
 	Short: "List discovered Go packages",
 	Long:  `List all discovered Go packages across multiple repositories with their configuration status.`,
 	RunE:  runList,
+}
+
+func init() {
+	listCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed information (module path, go version, github repo)")
 }
 
 func runList(cmd *cobra.Command, args []string) error {
@@ -34,23 +44,40 @@ func runList(cmd *cobra.Command, args []string) error {
 	color.White("Search paths: %s", strings.Join(searchPaths, ", "))
 	color.White("")
 
-	for i, pkg := range packages {
-		color.White("%d. %s", i+1, pkg.ModulePath)
-		fmt.Printf("   Path: %s\n", pkg.Path)
-		fmt.Printf("   Package: %s\n", pkg.PackageName)
-		if pkg.GoVersion != "" {
-			fmt.Printf("   Go Version: %s\n", pkg.GoVersion)
-		}
-		if pkg.GitHubRepo != "" {
-			fmt.Printf("   GitHub: %s\n", pkg.GitHubRepo)
-		}
-		if pkg.LatestTag != "" {
-			fmt.Printf("   Latest Tag: %s\n", pkg.LatestTag)
-		} else {
-			fmt.Printf("   Latest Tag: (no tags found)\n")
-		}
-		color.White("")
+	// Create table with modern API
+	table := tablewriter.NewWriter(os.Stdout)
+
+	if verbose {
+		table.Header("#", "Module", "Package", "Go Version", "GitHub", "Latest Tag")
+	} else {
+		table.Header("#", "Package", "Latest Tag")
 	}
 
+	// Add rows
+	for i, pkg := range packages {
+		// Handle empty values
+		goVersion := pkg.GoVersion
+		if goVersion == "" {
+			goVersion = "-"
+		}
+
+		github := pkg.GitHubRepo
+		if github == "" {
+			github = "-"
+		}
+
+		latestTag := pkg.LatestTag
+		if latestTag == "" {
+			latestTag = "(no tags)"
+		}
+
+		if verbose {
+			table.Append(fmt.Sprintf("%d", i+1), pkg.ModulePath, pkg.PackageName, goVersion, github, latestTag)
+		} else {
+			table.Append(fmt.Sprintf("%d", i+1), pkg.PackageName, latestTag)
+		}
+	}
+
+	table.Render()
 	return nil
 }
