@@ -14,8 +14,29 @@ A generic CLI tool for managing version tags across multiple Go repositories.
 
 ## Installation
 
-1. Navigate to the tag-manager directory:
+Install the latest version directly from GitHub:
+
+```bash
+go install github.com/gambitier/tag-manager@latest
+```
+
+This will install the `tag-manager` binary to your `$GOPATH/bin` directory (usually `~/go/bin`). Make sure `$GOPATH/bin` is in your `$PATH`.
+
+### Updating to Latest Version
+
+To update to the latest version:
+
+```bash
+go install github.com/gambitier/tag-manager@latest
+```
+
+## Development
+
+For development and building from source:
+
+1. Clone the repository:
    ```bash
+   git clone https://github.com/gambitier/tag-manager.git
    cd tag-manager
    ```
 
@@ -26,7 +47,14 @@ A generic CLI tool for managing version tags across multiple Go repositories.
 
 3. Build the application:
    ```bash
-   go build -o tag-manager
+   make build
+   # or
+   go build -o build/tag-manager
+   ```
+
+4. (Optional) Add to your PATH:
+   ```bash
+   sudo cp build/tag-manager /usr/local/bin/tag-manager
    ```
 
 ## Usage
@@ -34,7 +62,7 @@ A generic CLI tool for managing version tags across multiple Go repositories.
 ### List discovered packages
 
 ```bash
-./tag-manager list
+tag-manager list
 ```
 
 This command will scan for Go modules in the current directory and its subdirectories, displaying all discovered packages.
@@ -42,7 +70,7 @@ This command will scan for Go modules in the current directory and its subdirect
 ### Update a package tag
 
 ```bash
-./tag-manager update
+tag-manager update
 ```
 
 The tool will guide you through the entire process interactively:
@@ -56,7 +84,7 @@ The tool will guide you through the entire process interactively:
 
 **First-time setup for a package:**
 ```bash
-./tag-manager update
+tag-manager update
 # 1. Select package from discovered list
 # 2. Choose tag format (default or custom)
 # 3. Select version type
@@ -65,7 +93,7 @@ The tool will guide you through the entire process interactively:
 
 **Subsequent updates:**
 ```bash
-./tag-manager update
+tag-manager update
 # 1. Select package (configuration remembered)
 # 2. Select version type
 # 3. Confirm tag creation
@@ -76,8 +104,8 @@ The tool will guide you through the entire process interactively:
 The tool uses a configuration file (`~/.tag-manager.yaml`) to store package-specific settings:
 
 - **Tag Format**: Custom tag naming conventions per package
-- **Repository Mapping**: Links packages to their repositories
 - **Default Settings**: Global defaults for new packages
+- **Package Settings**: Individual package configurations
 
 **Default Tag Format**: `{package-name}/v{major}.{minor}.{patch}`
 
@@ -92,28 +120,33 @@ The tool uses a configuration file (`~/.tag-manager.yaml`) to store package-spec
 - `minor`: Increments the minor version (e.g., v1.2.3 → v1.3.0)
 - `patch`: Increments the patch version (e.g., v1.2.3 → v1.2.4)
 
-## Using Makefile
+## Development Makefile
 
-You can also use the provided Makefile for easier management:
+When building from source, you can use the provided Makefile for easier development:
 
 ```bash
+# Show all available commands
+make help
+
 # Build the application
 make build
 
-# Run the tag manager
+# Run the tag manager (interactive)
 make run
 
+# List packages
+make list
+
+# Show configuration
+make config
+
 # Clean build artifacts
 make clean
 ```
 
-**Note**: For the best interactive experience, run the command directly:
+**Note**: For end users who installed via `go install`, use the `tag-manager` command directly:
 ```bash
-./tag-manager update
-```
-
-# Clean build artifacts
-make clean
+tag-manager update
 ```
 
 ## How it works
@@ -135,7 +168,6 @@ The tool supports flexible tag formats through configuration:
 
 **Examples**:
 - `utils/v1.2.3`
-- `authorization/v0.1.0`
 - `cache/v2.0.0`
 
 **Custom Formats**:
@@ -150,11 +182,13 @@ The tool creates a configuration file at `~/.tag-manager.yaml` to store your pre
 ```yaml
 packages:
   github.com/example/package:
-    module_path: github.com/example/package
-    tag_format: "{package-name}/v{major}.{minor}.{patch}"
-    repository: example-repo
-    use_default: true
-    last_updated: "2024-01-01T00:00:00Z"
+    module_path: github.com/example/package1
+    tag_format: '{version}'
+    use_default: false
+  github.com/example/package2:
+    module_path: github.com/example/package2
+    tag_format: '{package-name}/v{major}.{minor}.{patch}'
+    use_default: false
 defaults:
-  tag_format: "{package-name}/v{major}.{minor}.{patch}"
+  tag_format: '{package-name}/v{major}.{minor}.{patch}'
 ```
