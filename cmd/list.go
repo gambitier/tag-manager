@@ -2,12 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/fatih/color"
 	"github.com/gambitier/tag-manager/pkg/discovery"
-	"github.com/olekukonko/tablewriter"
+	"github.com/gambitier/tag-manager/pkg/display"
 	"github.com/spf13/cobra"
 )
 
@@ -40,44 +39,13 @@ func runList(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	color.Cyan("Discovered %d Go packages:", len(packages))
-	color.White("Search paths: %s", strings.Join(searchPaths, ", "))
-	color.White("")
-
-	// Create table with modern API
-	table := tablewriter.NewWriter(os.Stdout)
-
+	// Determine display mode
+	mode := display.Compact
 	if verbose {
-		table.Header("#", "Module", "Package", "Go Version", "GitHub", "Latest Tag")
-	} else {
-		table.Header("#", "Package", "Latest Tag")
+		mode = display.Verbose
 	}
 
-	// Add rows
-	for i, pkg := range packages {
-		// Handle empty values
-		goVersion := pkg.GoVersion
-		if goVersion == "" {
-			goVersion = "-"
-		}
-
-		github := pkg.GitHubRepo
-		if github == "" {
-			github = "-"
-		}
-
-		latestTag := pkg.LatestTag
-		if latestTag == "" {
-			latestTag = "(no tags)"
-		}
-
-		if verbose {
-			table.Append(fmt.Sprintf("%d", i+1), pkg.ModulePath, pkg.PackageName, goVersion, github, latestTag)
-		} else {
-			table.Append(fmt.Sprintf("%d", i+1), pkg.PackageName, latestTag)
-		}
-	}
-
-	table.Render()
+	// Show package list with header
+	display.ShowPackageListWithHeader(packages, mode, searchPaths)
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/gambitier/tag-manager/pkg/config"
 	"github.com/gambitier/tag-manager/pkg/discovery"
+	"github.com/gambitier/tag-manager/pkg/display"
 	"github.com/gambitier/tag-manager/pkg/interactive"
 	"github.com/gambitier/tag-manager/pkg/tagutils"
 	"github.com/spf13/cobra"
@@ -44,6 +45,11 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		color.Yellow("Searched in: %s", strings.Join(searchPaths, ", "))
 		return nil
 	}
+
+	// Display available packages
+	color.Cyan("Available packages:")
+	display.ShowPackageList(packages, display.Compact)
+	color.White("")
 
 	// Let user select a package
 	selectedPackage, err := interactive.SelectPackage(packages)

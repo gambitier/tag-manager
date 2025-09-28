@@ -142,11 +142,7 @@ func SelectPackage(packages []discovery.Package) (*discovery.Package, error) {
 		return nil, fmt.Errorf("no packages found")
 	}
 
-	color.Cyan("\nAvailable packages:")
-	for i, pkg := range packages {
-		color.White("%d. %s (%s)", i+1, pkg.ModulePath, pkg.PackageName)
-	}
-
+	// No need to display packages again - they're already shown in the table
 	selection, err := selectOption(1, len(packages))
 	if err != nil {
 		return nil, err

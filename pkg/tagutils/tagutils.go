@@ -116,11 +116,16 @@ func ExtractPackageNameFromModule(modulePath string) string {
 
 // ValidateTagFormat validates a tag format string
 func ValidateTagFormat(format string) error {
-	// Check for required placeholders
-	required := []string{"{major}", "{minor}", "{patch}"}
-	for _, placeholder := range required {
-		if !strings.Contains(format, placeholder) {
-			return fmt.Errorf("tag format must contain %s placeholder", placeholder)
+	// Check if format contains {version} (which is valid on its own)
+	if strings.Contains(format, "{version}") {
+		// {version} is valid on its own, no other placeholders required
+	} else {
+		// If not using {version}, check for required individual placeholders
+		required := []string{"{major}", "{minor}", "{patch}"}
+		for _, placeholder := range required {
+			if !strings.Contains(format, placeholder) {
+				return fmt.Errorf("tag format must contain %s placeholder", placeholder)
+			}
 		}
 	}
 
