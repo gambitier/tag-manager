@@ -101,6 +101,16 @@ func GetConfigPath() string {
 	return filepath.Join(homeDir, ".tag-manager.yaml")
 }
 
+// GetDefaultConfig returns the default configuration
+func GetDefaultConfig() *Config {
+	return &Config{
+		Packages: make(map[string]PackageConfig),
+		Defaults: DefaultConfig{
+			TagFormat: "{package-name}/v{major}.{minor}.{patch}",
+		},
+	}
+}
+
 // GetPackageConfig returns configuration for a specific package
 func (c *Config) GetPackageConfig(modulePath string) PackageConfig {
 	if pkg, exists := c.Packages[modulePath]; exists {
