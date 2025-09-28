@@ -22,13 +22,10 @@ func SetupPackageConfig(cfg *config.Config, pkg discovery.Package) (*config.Pack
 
 	// Check if package already has configuration
 	if existingConfig, exists := cfg.Packages[pkg.ModulePath]; exists {
-		color.Green("Package already configured:")
+		color.Green("Using existing configuration:")
 		color.White("  Tag Format: %s", existingConfig.TagFormat)
 		color.White("  Use Default: %t", existingConfig.UseDefault)
-
-		if AskForConfirmation("Do you want to reconfigure this package?") {
-			return configurePackage(cfg, pkg)
-		}
+		color.White("")
 		return &existingConfig, nil
 	}
 
