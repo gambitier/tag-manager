@@ -52,20 +52,27 @@ func runDepsUpdate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("dependency validation failed: %w", err)
 	}
 
-	// Let user select a package to update
-	packages := make([]discovery.Package, 0, len(graph.Packages))
-	for _, pkg := range graph.Packages {
-		packages = append(packages, discovery.Package{
-			ModulePath:  pkg.ModulePath,
-			PackageName: pkg.PackageName,
-			Path:        pkg.Directory,
-			GoVersion:   "", // We don't need this for dependency updates
-			GitHubRepo:  "", // We don't need this for dependency updates
-		})
+	// Get actual package information with tags
+	actualPackages, err := discovery.DiscoverPackages(searchPaths)
+	if err != nil {
+		return fmt.Errorf("failed to discover packages: %w", err)
 	}
 
-	color.Cyan("Select a package to update:")
-	selectedPackage, err := interactive.SelectPackage(packages)
+	// Filter packages to only include those in the dependency graph
+	var packages []discovery.Package
+	for _, actualPkg := range actualPackages {
+		if _, exists := graph.Packages[actualPkg.ModulePath]; exists {
+			packages = append(packages, actualPkg)
+		}
+	}
+
+	if len(packages) == 0 {
+		color.Red("No packages found in dependency graph.")
+		return nil
+	}
+
+	// Use the new wrapper function
+	selectedPackage, err := interactive.SelectPackageWithDisplayAndPrompt(packages, "Available packages", "Select a package to update")
 	if err != nil {
 		return fmt.Errorf("failed to select package: %w", err)
 	}
