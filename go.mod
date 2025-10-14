@@ -1,6 +1,6 @@
 module github.com/gambitier/tag-manager
 
-go 1.23.3
+go 1.25.2
 
 require (
 	github.com/fatih/color v1.16.0
