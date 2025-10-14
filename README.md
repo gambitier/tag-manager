@@ -20,6 +20,7 @@ A generic CLI tool for managing version tags across multiple Go repositories.
 - **Dependency Analysis**: Analyze and visualize package dependency relationships
 - **Dependency-Aware Updates**: Update packages and all their dependents automatically
 - **Circular Dependency Detection**: Validates dependency graphs for circular dependencies
+- **Safety Checks**: Prevents updates when circular dependencies are detected
 - **Multiple Output Formats**: Tree, matrix, and levels view for dependency visualization
 
 ## Installation
@@ -113,10 +114,11 @@ tag-manager deps-update
 
 Update a package and automatically update all packages that depend on it:
 1. **Package Selection**: Choose the package to update
-2. **Impact Analysis**: Shows which packages will be affected
-3. **Version Selection**: Choose version type (major/minor/patch)
-4. **Update Plan**: Shows the complete update plan
-5. **Execution**: Updates packages in the correct dependency order
+2. **Circular Dependency Check**: Validates no circular dependencies exist
+3. **Impact Analysis**: Shows which packages will be affected
+4. **Version Selection**: Choose version type (major/minor/patch)
+5. **Update Plan**: Shows the complete update plan
+6. **Execution**: Updates packages in the correct dependency order
 
 Options:
 - `--auto, -a`: Automatically update all dependents without confirmation

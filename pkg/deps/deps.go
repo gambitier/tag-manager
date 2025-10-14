@@ -303,6 +303,107 @@ func (g *DependencyGraph) ValidateGraph() error {
 	return nil
 }
 
+// CheckCircularDependencyWithPackage checks if updating a specific package would create circular dependencies
+func (g *DependencyGraph) CheckCircularDependencyWithPackage(packagePath string) error {
+	// Check if package exists
+	_, exists := g.GetPackageByPath(packagePath)
+	if !exists {
+		return fmt.Errorf("package %s not found", packagePath)
+	}
+
+	// Check if this package is involved in any circular dependency
+	visited := make(map[string]bool)
+	recStack := make(map[string]bool)
+	var cyclePath []string
+
+	var hasCycleInvolvingPackage func(pkgPath string, path []string) bool
+	hasCycleInvolvingPackage = func(pkgPath string, path []string) bool {
+		visited[pkgPath] = true
+		recStack[pkgPath] = true
+		currentPath := append(path, pkgPath)
+
+		if pkg, exists := g.Packages[pkgPath]; exists {
+			for _, dep := range pkg.Dependencies {
+				if !visited[dep] {
+					if hasCycleInvolvingPackage(dep, currentPath) {
+						return true
+					}
+				} else if recStack[dep] {
+					// Found a cycle - check if our target package is involved
+					cyclePath = append(currentPath, dep)
+					for _, cyclePkg := range cyclePath {
+						if cyclePkg == packagePath {
+							return true
+						}
+					}
+				}
+			}
+		}
+
+		recStack[pkgPath] = false
+		return false
+	}
+
+	// Check all packages to see if any cycle involves our target package
+	for pkgPath := range g.Packages {
+		if !visited[pkgPath] {
+			if hasCycleInvolvingPackage(pkgPath, []string{}) {
+				// Found a cycle involving our package
+				return fmt.Errorf("circular dependency detected involving package %s: %s",
+					packagePath, strings.Join(cyclePath, " -> "))
+			}
+		}
+	}
+
+	return nil
+}
+
+// GetCircularDependencyPath returns the path of a circular dependency involving a specific package
+func (g *DependencyGraph) GetCircularDependencyPath(packagePath string) ([]string, error) {
+	visited := make(map[string]bool)
+	recStack := make(map[string]bool)
+	var cyclePath []string
+
+	var findCycleInvolvingPackage func(pkgPath string, path []string) bool
+	findCycleInvolvingPackage = func(pkgPath string, path []string) bool {
+		visited[pkgPath] = true
+		recStack[pkgPath] = true
+		currentPath := append(path, pkgPath)
+
+		if pkg, exists := g.Packages[pkgPath]; exists {
+			for _, dep := range pkg.Dependencies {
+				if !visited[dep] {
+					if findCycleInvolvingPackage(dep, currentPath) {
+						return true
+					}
+				} else if recStack[dep] {
+					// Found a cycle - check if our target package is involved
+					cyclePath = append(currentPath, dep)
+					for _, cyclePkg := range cyclePath {
+						if cyclePkg == packagePath {
+							return true
+						}
+					}
+				}
+			}
+		}
+
+		recStack[pkgPath] = false
+		return false
+	}
+
+	// Check all packages to see if any cycle involves our target package
+	for pkgPath := range g.Packages {
+		if !visited[pkgPath] {
+			if findCycleInvolvingPackage(pkgPath, []string{}) {
+				return cyclePath, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("no circular dependency found involving package %s", packagePath)
+}
+
 // GetPackageByPath returns a package by its module path
 func (g *DependencyGraph) GetPackageByPath(modulePath string) (*Package, bool) {
 	pkg, exists := g.Packages[modulePath]

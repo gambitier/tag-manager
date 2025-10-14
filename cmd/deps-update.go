@@ -47,7 +47,7 @@ func runDepsUpdate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to analyze dependencies: %w", err)
 	}
 
-	// Validate graph
+	// Validate graph for general circular dependencies
 	if err := graph.ValidateGraph(); err != nil {
 		return fmt.Errorf("dependency validation failed: %w", err)
 	}
@@ -75,6 +75,35 @@ func runDepsUpdate(cmd *cobra.Command, args []string) error {
 	if !exists {
 		return fmt.Errorf("package not found in dependency graph")
 	}
+
+	// Check for circular dependencies involving this specific package
+	color.Yellow("\n🔍 Checking for circular dependencies...")
+	if err := graph.CheckCircularDependencyWithPackage(selectedPackage.ModulePath); err != nil {
+		color.Red("❌ CIRCULAR DEPENDENCY DETECTED!")
+		color.Red("Cannot update package %s due to circular dependency", pkg.PackageName)
+		color.Red("Error: %v", err)
+
+		// Try to get the circular dependency path for more details
+		if cyclePath, pathErr := graph.GetCircularDependencyPath(selectedPackage.ModulePath); pathErr == nil {
+			color.Yellow("\n🔄 Circular dependency path:")
+			for i, cyclePkg := range cyclePath {
+				if i == len(cyclePath)-1 {
+					color.Red("  %s", cyclePkg)
+				} else {
+					color.White("  %s →", cyclePkg)
+				}
+			}
+		}
+
+		color.Yellow("\n💡 To resolve this issue:")
+		color.White("  1. Review the dependency structure")
+		color.White("  2. Remove or refactor the circular dependency")
+		color.White("  3. Use 'tag-manager deps' to visualize dependencies")
+
+		return fmt.Errorf("update cancelled due to circular dependency")
+	}
+
+	color.Green("✅ No circular dependencies detected")
 
 	// Show dependency impact
 	impact := graph.GetUpdateImpact(selectedPackage.ModulePath)
