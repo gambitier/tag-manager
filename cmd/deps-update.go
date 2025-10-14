@@ -13,6 +13,7 @@ import (
 	"github.com/gambitier/tag-manager/pkg/discovery"
 	"github.com/gambitier/tag-manager/pkg/interactive"
 	"github.com/gambitier/tag-manager/pkg/tagutils"
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
 
@@ -242,36 +243,21 @@ func runDepsUpdate(cmd *cobra.Command, args []string) error {
 	color.Green("\n🚀 Update Plan")
 	color.White("=============")
 
-	// Create table header
-	color.Cyan("┌────┬─────────────────────┬────────────────────────────┬────────────────────────────┐")
-	color.Cyan("│ #  │       PACKAGE       │         CURRENT TAG        │          NEW TAG           │")
-	color.Cyan("├────┼─────────────────────┼────────────────────────────┼────────────────────────────┤")
+	// Create table using tablewriter
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header("#", "Package", "Current Tag", "New Tag")
 
-	// Show each update step
+	// Add rows
 	for i, step := range updatePlan {
-		// Truncate long package names and tags for display
-		pkgName := step.PackageName
-		if len(pkgName) > 19 {
-			pkgName = pkgName[:16] + "..."
-		}
-
-		currentTag := step.CurrentTag
-		if len(currentTag) > 28 {
-			currentTag = currentTag[:25] + "..."
-		}
-
-		newTag := step.NewTag
-		if len(newTag) > 28 {
-			newTag = newTag[:25] + "..."
-		}
-
-		// Format the row
-		color.White("│ %-2d │ %-19s │ %-28s │ %-28s │",
-			i+1, pkgName, currentTag, newTag)
+		table.Append(
+			fmt.Sprintf("%d", i+1),
+			step.PackageName,
+			step.CurrentTag,
+			step.NewTag,
+		)
 	}
 
-	// Close table
-	color.Cyan("└────┴─────────────────────┴────────────────────────────┴────────────────────────────┘")
+	table.Render()
 
 	// Show summary
 	color.Yellow("\n📊 Summary:")
