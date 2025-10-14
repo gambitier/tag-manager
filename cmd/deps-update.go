@@ -178,43 +178,33 @@ func runDepsUpdate(cmd *cobra.Command, args []string) error {
 	// Ask user about configuration management
 	color.Yellow("\nConfiguration Options:")
 
-	var options []string
 	if needingConfigCount > 0 {
-		options = []string{
+		// Packages need configuration - ask user what to do
+		options := []string{
 			"Bulk configure all packages with same format (recommended)",
 			"Configure packages one by one",
 			"Manually edit config file and resume",
 		}
-	} else {
-		options = []string{
-			"Continue with dependency update (all packages configured)",
-			"Manually edit config file and resume",
+
+		configChoice, err := interactive.SelectOption(options)
+		if err != nil {
+			return fmt.Errorf("failed to select configuration option: %w", err)
 		}
-	}
 
-	configChoice, err := interactive.SelectOption(options)
-	if err != nil {
-		return fmt.Errorf("failed to select configuration option: %w", err)
-	}
-
-	if needingConfigCount > 0 {
-		// Packages need configuration
 		switch configChoice {
 		case 1: // Bulk configure packages
-			return handleBulkConfigSetup(cfg, configPath, allPackages)
+			if err := handleBulkConfigSetup(cfg, configPath, allPackages); err != nil {
+				return err
+			}
+			color.Green("Bulk configuration completed! Continuing with dependency update...")
 		case 2: // Configure packages one by one
 			color.Green("Continuing with individual package configuration setup...")
 		case 3: // Manually edit config file
 			return handleManualConfigEdit(configPath, selectedPackage.ModulePath)
 		}
 	} else {
-		// All packages already configured
-		switch configChoice {
-		case 1: // Continue with dependency update
-			color.Green("All packages configured! Continuing with dependency update...")
-		case 2: // Manually edit config file
-			return handleManualConfigEdit(configPath, selectedPackage.ModulePath)
-		}
+		// All packages already configured - continue directly
+		color.Green("All packages configured! Continuing with dependency update...")
 	}
 
 	// Get version type
@@ -248,12 +238,45 @@ func runDepsUpdate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create update plan: %w", err)
 	}
 
-	// Show update plan
+	// Show update plan in table format
 	color.Green("\n🚀 Update Plan")
 	color.White("=============")
+
+	// Create table header
+	color.Cyan("┌────┬─────────────────────┬────────────────────────────┬────────────────────────────┐")
+	color.Cyan("│ #  │       PACKAGE       │         CURRENT TAG        │          NEW TAG           │")
+	color.Cyan("├────┼─────────────────────┼────────────────────────────┼────────────────────────────┤")
+
+	// Show each update step
 	for i, step := range updatePlan {
-		color.White("%d. %s → %s", i+1, step.PackageName, step.NewTag)
+		// Truncate long package names and tags for display
+		pkgName := step.PackageName
+		if len(pkgName) > 19 {
+			pkgName = pkgName[:16] + "..."
+		}
+
+		currentTag := step.CurrentTag
+		if len(currentTag) > 28 {
+			currentTag = currentTag[:25] + "..."
+		}
+
+		newTag := step.NewTag
+		if len(newTag) > 28 {
+			newTag = newTag[:25] + "..."
+		}
+
+		// Format the row
+		color.White("│ %-2d │ %-19s │ %-28s │ %-28s │",
+			i+1, pkgName, currentTag, newTag)
 	}
+
+	// Close table
+	color.Cyan("└────┴─────────────────────┴────────────────────────────┴────────────────────────────┘")
+
+	// Show summary
+	color.Yellow("\n📊 Summary:")
+	color.White("  • %d packages will be updated", len(updatePlan))
+	color.White("  • Version type: %s", versionType)
 
 	// Confirm update
 	if !depsUpdateAuto {
@@ -434,8 +457,8 @@ func handleBulkConfigSetup(cfg *config.Config, configPath string, allPackages []
 	// Show packages that need configuration
 	var packagesNeedingConfig []string
 	for _, modulePath := range allPackages {
-		pkgConfig := cfg.GetPackageConfig(modulePath)
-		if pkgConfig.TagFormat == "" {
+		// Check if package actually exists in config (not just has default format)
+		if _, exists := cfg.Packages[modulePath]; !exists {
 			packagesNeedingConfig = append(packagesNeedingConfig, filepath.Base(modulePath))
 		}
 	}
@@ -481,10 +504,11 @@ func handleBulkConfigSetup(cfg *config.Config, configPath string, allPackages []
 	updatedCount := 0
 
 	for _, modulePath := range allPackages {
-		pkgConfig := cfg.GetPackageConfig(modulePath)
-		if pkgConfig.TagFormat == "" {
+		// Only configure packages that don't have explicit config
+		if _, exists := cfg.Packages[modulePath]; !exists {
 			// Set the configuration
 			newConfig := config.PackageConfig{
+				ModulePath: modulePath, // Set the module path!
 				TagFormat:  tagFormat,
 				UseDefault: tagFormatChoice == 1,
 			}
