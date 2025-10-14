@@ -2,7 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/gambitier/tag-manager/pkg/config"
@@ -129,6 +132,91 @@ func runDepsUpdate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Show configuration information and options
+	color.Cyan("\n⚙️  Configuration Management")
+	color.White("============================")
+	color.White("Config file location: %s", configPath)
+
+	// Show configuration status for packages that will be updated
+	allPackages := append([]string{selectedPackage.ModulePath}, impact...)
+	var packagesNeedingConfig []string
+	var packagesAlreadyConfigured []string
+
+	for _, modulePath := range allPackages {
+		pkgName := filepath.Base(modulePath)
+
+		// Check if package actually exists in config (not just has default format)
+		if _, exists := cfg.Packages[modulePath]; exists {
+			packagesAlreadyConfigured = append(packagesAlreadyConfigured, pkgName)
+		} else {
+			packagesNeedingConfig = append(packagesNeedingConfig, pkgName)
+		}
+	}
+
+	color.Yellow("\nPackage Configuration Status:")
+	if len(packagesNeedingConfig) > 0 {
+		color.Red("  ❌ NEEDS CONFIGURATION: %s", strings.Join(packagesNeedingConfig, ", "))
+		color.White("     These packages don't have tag formats set up yet")
+	}
+	if len(packagesAlreadyConfigured) > 0 {
+		color.Green("  ✅ ALREADY CONFIGURED: %s", strings.Join(packagesAlreadyConfigured, ", "))
+		color.White("     These packages have tag formats set up")
+	}
+
+	// Show summary
+	totalPackages := len(allPackages)
+	configuredCount := len(packagesAlreadyConfigured)
+	needingConfigCount := len(packagesNeedingConfig)
+
+	color.Cyan("\nSummary: %d/%d packages configured", configuredCount, totalPackages)
+	if needingConfigCount > 0 {
+		color.Yellow("⚠️  %d packages need configuration before update", needingConfigCount)
+	} else {
+		color.Green("🎉 All packages are configured and ready for update!")
+	}
+
+	// Ask user about configuration management
+	color.Yellow("\nConfiguration Options:")
+
+	var options []string
+	if needingConfigCount > 0 {
+		options = []string{
+			"Bulk configure all packages with same format (recommended)",
+			"Configure packages one by one",
+			"Manually edit config file and resume",
+		}
+	} else {
+		options = []string{
+			"Continue with dependency update (all packages configured)",
+			"Manually edit config file and resume",
+		}
+	}
+
+	configChoice, err := interactive.SelectOption(options)
+	if err != nil {
+		return fmt.Errorf("failed to select configuration option: %w", err)
+	}
+
+	if needingConfigCount > 0 {
+		// Packages need configuration
+		switch configChoice {
+		case 1: // Bulk configure packages
+			return handleBulkConfigSetup(cfg, configPath, allPackages)
+		case 2: // Configure packages one by one
+			color.Green("Continuing with individual package configuration setup...")
+		case 3: // Manually edit config file
+			return handleManualConfigEdit(configPath, selectedPackage.ModulePath)
+		}
+	} else {
+		// All packages already configured
+		switch configChoice {
+		case 1: // Continue with dependency update
+			color.Green("All packages configured! Continuing with dependency update...")
+		case 2: // Manually edit config file
+			return handleManualConfigEdit(configPath, selectedPackage.ModulePath)
+		}
+	}
+
 	// Get version type
 	var versionType string
 	if depsUpdateVersion != "" {
@@ -143,8 +231,8 @@ func runDepsUpdate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Setup package configuration
-	pkgConfig, err := interactive.SetupPackageConfig(cfg, *selectedPackage)
+	// Setup package configuration for the root package
+	_, err = interactive.SetupPackageConfig(cfg, *selectedPackage)
 	if err != nil {
 		return fmt.Errorf("failed to setup package configuration: %w", err)
 	}
@@ -155,7 +243,7 @@ func runDepsUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create update plan
-	updatePlan, err := createUpdatePlan(graph, pkg, versionType, pkgConfig.TagFormat)
+	updatePlan, err := createUpdatePlan(graph, pkg, versionType, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create update plan: %w", err)
 	}
@@ -225,7 +313,7 @@ type UpdateStep struct {
 }
 
 // createUpdatePlan creates a plan for updating packages in the correct order
-func createUpdatePlan(graph *deps.DependencyGraph, rootPkg *deps.Package, versionType, tagFormat string) ([]UpdateStep, error) {
+func createUpdatePlan(graph *deps.DependencyGraph, rootPkg *deps.Package, versionType string, cfg *config.Config) ([]UpdateStep, error) {
 	var plan []UpdateStep
 
 	// Get all packages that need to be updated (root + dependents)
@@ -239,8 +327,11 @@ func createUpdatePlan(graph *deps.DependencyGraph, rootPkg *deps.Package, versio
 			continue
 		}
 
-		// Get current tag
-		currentTag, err := getCurrentTag(pkg.Directory, tagFormat)
+		// Get package-specific configuration
+		pkgConfig := cfg.GetPackageConfig(pkg.ModulePath)
+
+		// Get current tag using package-specific format
+		currentTag, err := getCurrentTag(pkg.Directory, pkgConfig.TagFormat)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get current tag for %s: %w", pkg.PackageName, err)
 		}
@@ -264,8 +355,8 @@ func createUpdatePlan(graph *deps.DependencyGraph, rootPkg *deps.Package, versio
 			return nil, fmt.Errorf("failed to calculate new version for %s: %w", pkg.PackageName, err)
 		}
 
-		// Format new tag
-		newTag := tagutils.FormatTag(tagFormat, *newVersion)
+		// Format new tag using package-specific format
+		newTag := tagutils.FormatTag(pkgConfig.TagFormat, *newVersion)
 
 		plan = append(plan, UpdateStep{
 			PackageName: pkg.PackageName,
@@ -293,6 +384,123 @@ func executeUpdate(step UpdateStep) error {
 	if err := pushCmd.Run(); err != nil {
 		return fmt.Errorf("failed to push git tag: %w", err)
 	}
+
+	return nil
+}
+
+// handleManualConfigEdit handles the manual configuration editing flow
+func handleManualConfigEdit(configPath, packageModulePath string) error {
+	color.Cyan("\n📝 Manual Configuration Edit")
+	color.White("============================")
+
+	// Check if config file exists
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		color.Yellow("Config file does not exist. Creating default configuration...")
+		// Create default config
+		defaultConfig := config.GetDefaultConfig()
+		if err := config.SaveConfig(defaultConfig, configPath); err != nil {
+			return fmt.Errorf("failed to create default config: %w", err)
+		}
+	}
+
+	// Show config file path and instructions
+	color.Yellow("\n📁 Configuration File:")
+	color.White("File: %s", configPath)
+
+	// Get file size
+	if fileInfo, err := os.Stat(configPath); err == nil {
+		color.White("Size: %d bytes", fileInfo.Size())
+	}
+
+	// Instructions for editing
+	color.Cyan("\n📋 Instructions:")
+	color.White("1. Edit the config file above to customize package tag formats")
+	color.White("2. Save the file when done")
+	color.White("3. Run the command again to continue")
+
+	color.Green("\n✅ Ready for manual editing!")
+	color.White("Run the command again after editing the config file.")
+
+	// Exit gracefully without error
+	os.Exit(0)
+	return nil // This will never be reached, but satisfies the compiler
+}
+
+// handleBulkConfigSetup handles bulk configuration setup for multiple packages
+func handleBulkConfigSetup(cfg *config.Config, configPath string, allPackages []string) error {
+	color.Cyan("\n🔧 Bulk Configuration Setup")
+	color.White("============================")
+
+	// Show packages that need configuration
+	var packagesNeedingConfig []string
+	for _, modulePath := range allPackages {
+		pkgConfig := cfg.GetPackageConfig(modulePath)
+		if pkgConfig.TagFormat == "" {
+			packagesNeedingConfig = append(packagesNeedingConfig, filepath.Base(modulePath))
+		}
+	}
+
+	if len(packagesNeedingConfig) == 0 {
+		color.Green("All packages already have configurations!")
+		color.White("Continuing with existing configurations...")
+		return nil
+	}
+
+	color.Yellow("Packages needing configuration: %s", strings.Join(packagesNeedingConfig, ", "))
+
+	// Ask for tag format
+	color.Cyan("\nTag Format Options:")
+	tagFormatChoice, err := interactive.SelectOption([]string{
+		"Default format: {package-name}/v{major}.{minor}.{patch}",
+		"Simple format: v{major}.{minor}.{patch}",
+		"Custom format (you'll be prompted)",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to select tag format: %w", err)
+	}
+
+	var tagFormat string
+	switch tagFormatChoice {
+	case 1: // Default format
+		tagFormat = "{package-name}/v{major}.{minor}.{patch}"
+	case 2: // Simple format
+		tagFormat = "v{major}.{minor}.{patch}"
+	case 3: // Custom format
+		color.Cyan("\nEnter custom tag format:")
+		color.White("Available placeholders: {package-name}, {major}, {minor}, {patch}")
+		color.White("Example: {package-name}-v{major}.{minor}.{patch}")
+		fmt.Print("Format: ")
+		fmt.Scanln(&tagFormat)
+		if tagFormat == "" {
+			return fmt.Errorf("tag format cannot be empty")
+		}
+	}
+
+	// Apply configuration to all packages
+	color.Yellow("\nApplying configuration to packages...")
+	updatedCount := 0
+
+	for _, modulePath := range allPackages {
+		pkgConfig := cfg.GetPackageConfig(modulePath)
+		if pkgConfig.TagFormat == "" {
+			// Set the configuration
+			newConfig := config.PackageConfig{
+				TagFormat:  tagFormat,
+				UseDefault: tagFormatChoice == 1,
+			}
+			cfg.SetPackageConfig(modulePath, newConfig)
+			updatedCount++
+		}
+	}
+
+	// Save configuration
+	if err := config.SaveConfig(cfg, configPath); err != nil {
+		return fmt.Errorf("failed to save configuration: %w", err)
+	}
+
+	color.Green("✅ Bulk configuration completed!")
+	color.White("Updated %d packages with format: %s", updatedCount, tagFormat)
+	color.White("Continuing with dependency update...")
 
 	return nil
 }
