@@ -17,6 +17,10 @@ A generic CLI tool for managing version tags across multiple Go repositories.
 - **Configuration Persistence**: Remembers your tag naming preferences
 - **Multi-Repository Support**: Works across any number of Go repositories
 - **Git Integration**: Automatic tag creation and pushing
+- **Dependency Analysis**: Analyze and visualize package dependency relationships
+- **Dependency-Aware Updates**: Update packages and all their dependents automatically
+- **Circular Dependency Detection**: Validates dependency graphs for circular dependencies
+- **Multiple Output Formats**: Tree, matrix, and levels view for dependency visualization
 
 ## Installation
 
@@ -86,6 +90,38 @@ The tool will guide you through the entire process interactively:
 4. **Version Selection**: Choose version type (major/minor/patch)
 5. **Confirmation**: Review and confirm the tag update
 
+### Show dependency graph
+
+```bash
+tag-manager deps
+```
+
+Analyze and display the dependency relationships between packages:
+- **Tree format** (default): Shows hierarchical dependency structure
+- **Matrix format**: Shows dependency matrix table
+- **Levels format**: Groups packages by dependency level
+
+Options:
+- `--format, -f`: Output format (tree, matrix, levels)
+- `--filter`: Filter packages by name (partial match)
+
+### Update package and dependents
+
+```bash
+tag-manager deps-update
+```
+
+Update a package and automatically update all packages that depend on it:
+1. **Package Selection**: Choose the package to update
+2. **Impact Analysis**: Shows which packages will be affected
+3. **Version Selection**: Choose version type (major/minor/patch)
+4. **Update Plan**: Shows the complete update plan
+5. **Execution**: Updates packages in the correct dependency order
+
+Options:
+- `--auto, -a`: Automatically update all dependents without confirmation
+- `--version, -v`: Version type (major, minor, patch)
+
 ### Examples
 
 **First-time setup for a package:**
@@ -103,6 +139,40 @@ tag-manager update
 # 1. Select package (configuration remembered)
 # 2. Select version type
 # 3. Confirm tag creation
+```
+
+**Show dependency tree:**
+```bash
+tag-manager deps
+# Shows hierarchical dependency structure
+```
+
+**Show dependency matrix:**
+```bash
+tag-manager deps --format matrix
+# Shows dependency matrix table
+```
+
+**Filter dependencies:**
+```bash
+tag-manager deps --filter utils
+# Shows only packages containing "utils" in name
+```
+
+**Update package and all dependents:**
+```bash
+tag-manager deps-update
+# 1. Select package to update
+# 2. Review impact analysis
+# 3. Select version type
+# 4. Confirm update plan
+# 5. Execute updates in correct order
+```
+
+**Auto-update without confirmation:**
+```bash
+tag-manager deps-update --auto --version patch
+# Automatically updates package and all dependents with patch version
 ```
 
 ### Configuration

@@ -28,4 +28,6 @@ func init() {
 	rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(configCmd)
+	rootCmd.AddCommand(depsCmd)
+	rootCmd.AddCommand(depsUpdateCmd)
 }
