@@ -30,4 +30,5 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(depsCmd)
 	rootCmd.AddCommand(depsUpdateCmd)
+	rootCmd.AddCommand(syncTagsCmd)
 }
