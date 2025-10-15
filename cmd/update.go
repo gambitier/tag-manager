@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/fatih/color"
@@ -127,21 +128,34 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func getCurrentTag(modulePath, tagFormat string) (string, error) {
-	// Try to find existing tags that match the expected format
-	// We'll search for tags that could match our format
-	packageName := tagutils.ExtractPackageNameFromModule(modulePath)
+func getCurrentTag(pathOrModulePath, _ string) (string, error) {
+	// Determine if this is a directory path or module path
+	var packageName string
+	var workingDir string
+
+	// Check if it's a directory path (contains slashes and exists as directory)
+	if strings.Contains(pathOrModulePath, "/") && !strings.HasPrefix(pathOrModulePath, "github.com/") {
+		// It's a directory path
+		workingDir = pathOrModulePath
+		packageName = filepath.Base(pathOrModulePath)
+	} else {
+		// It's a module path
+		packageName = tagutils.ExtractPackageNameFromModule(pathOrModulePath)
+		workingDir = "." // Use current directory
+	}
 
 	// Try different tag patterns
 	patterns := []string{
-		fmt.Sprintf("%s/*", packageName),
-		fmt.Sprintf("%s-*", packageName),
-		"v*",
-		"*",
+		fmt.Sprintf("v1/%s/*", packageName), // v1/package-name/*
+		fmt.Sprintf("%s/*", packageName),    // package-name/*
+		fmt.Sprintf("%s-*", packageName),    // package-name-*
+		"v*",                                // any v* tags
+		"*",                                 // any tags
 	}
 
 	for _, pattern := range patterns {
 		cmd := exec.Command("git", "tag", "--list", pattern, "--sort=-version:refname")
+		cmd.Dir = workingDir
 		output, err := cmd.Output()
 		if err != nil {
 			continue
